@@ -1,0 +1,5 @@
+{
+  "name": "EquiVal - Public Company Evaluator",
+  "description": "A professional-grade financial analysis tool powered by Gemini Pro. Evaluates public companies using real-time market data and deep reasoning to provide SWOT analysis, risk assessment, and financial health summaries.",
+  "requestFramePermissions": []
+}
