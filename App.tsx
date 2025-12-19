@@ -5,6 +5,7 @@ import { MetricCard } from './components/MetricCard';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
 import { Loader } from './components/Loader';
 import { GroundingSources } from './components/GroundingSources';
+import { IncomeStatement } from './components/IncomeStatement';
 import { Search, BarChart3, PieChart, LineChart, AlertCircle } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -136,6 +137,11 @@ const App: React.FC = () => {
                   <MetricCard key={idx} metric={metric} />
                 ))}
               </div>
+
+              {/* Income Statement KPIs */}
+              {result.incomeData && (
+                <IncomeStatement data={result.incomeData} />
+              )}
 
               {/* Main Analysis Report */}
               <div className="bg-slate-900/50 rounded-2xl border border-slate-800 p-8 shadow-xl">

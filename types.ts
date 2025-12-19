@@ -9,9 +9,19 @@ export interface GroundingSource {
   url: string;
 }
 
+export interface IncomeData {
+  revenue: string;
+  revenueGrowth: string;
+  grossMargin: string;
+  operatingMargin: string;
+  netIncome: string;
+  netMargin: string;
+}
+
 export interface AnalysisResult {
   markdownContent: string;
   metrics: Metric[];
+  incomeData?: IncomeData;
   sources: GroundingSource[];
   companyName: string;
   ticker: string;

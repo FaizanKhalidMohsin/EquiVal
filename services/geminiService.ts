@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { AnalysisResult, Metric, GroundingSource } from "../types";
+import { AnalysisResult, Metric, GroundingSource, IncomeData } from "../types";
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -21,8 +21,9 @@ Structure your response strictly in the following format:
 4.  **Recent Developments**: Summarize the most significant news from the last 3-6 months based on search results.
 5.  **Investment Verdict**: A purely educational "Bull case" vs "Bear case" summary.
 
-At the VERY END of your response, after all text, output a special block strictly for metrics extraction. Use exactly this format:
+At the VERY END of your response, after all text, output TWO special blocks.
 
+Block 1: General Metrics
 ---METRICS_START---
 Price: [Current Stock Price with currency symbol]
 Market Cap: [Current Market Cap]
@@ -30,6 +31,16 @@ P/E Ratio: [Current P/E or 'N/A']
 YoY Growth: [Revenue Growth % or 'N/A']
 Sentiment: [Bullish/Bearish/Neutral based on analysis]
 ---METRICS_END---
+
+Block 2: Income Statement Snapshot (Use TTM or latest fiscal year data)
+---INCOME_START---
+Revenue: [e.g. $383.9B]
+Revenue Growth: [e.g. +5.2%]
+Gross Margin: [e.g. 45.3%]
+Operating Margin: [e.g. 30.8%]
+Net Income: [e.g. $97.0B]
+Net Margin: [e.g. 25.3%]
+---INCOME_END---
 `;
 
 export const analyzeCompany = async (query: string): Promise<AnalysisResult> => {
@@ -62,34 +73,61 @@ export const analyzeCompany = async (query: string): Promise<AnalysisResult> => 
       });
     }
 
-    // Extract Metrics Block
-    const metrics: Metric[] = [];
-    const metricsRegex = /---METRICS_START---([\s\S]*?)---METRICS_END---/;
-    const match = text.match(metricsRegex);
     let cleanMarkdown = text;
 
-    if (match && match[1]) {
-      // Remove metrics block from display text
-      cleanMarkdown = text.replace(metricsRegex, '').trim();
+    // Helper to extract block content
+    const extractBlock = (startTag: string, endTag: string): Record<string, string> => {
+      const regex = new RegExp(`${startTag}([\\s\\S]*?)${endTag}`);
+      const match = text.match(regex);
+      const data: Record<string, string> = {};
       
-      const lines = match[1].trim().split('\n');
-      lines.forEach(line => {
-        const [key, val] = line.split(':').map(s => s.trim());
-        if (key && val) {
-            let trend: 'up' | 'down' | 'neutral' | undefined = undefined;
-            if (key === 'Sentiment') {
-                if (val.toLowerCase().includes('bull')) trend = 'up';
-                else if (val.toLowerCase().includes('bear')) trend = 'down';
-                else trend = 'neutral';
-            }
-            metrics.push({ label: key, value: val, trend });
-        }
-      });
+      if (match && match[1]) {
+        // Remove block from display text
+        cleanMarkdown = cleanMarkdown.replace(match[0], '');
+        
+        const lines = match[1].trim().split('\n');
+        lines.forEach(line => {
+          const [key, val] = line.split(':').map(s => s.trim());
+          if (key && val) {
+            data[key] = val;
+          }
+        });
+      }
+      return data;
+    };
+
+    // Extract Metrics
+    const rawMetrics = extractBlock('---METRICS_START---', '---METRICS_END---');
+    const metrics: Metric[] = Object.entries(rawMetrics).map(([key, val]) => {
+      let trend: 'up' | 'down' | 'neutral' | undefined = undefined;
+      if (key === 'Sentiment') {
+          if (val.toLowerCase().includes('bull')) trend = 'up';
+          else if (val.toLowerCase().includes('bear')) trend = 'down';
+          else trend = 'neutral';
+      }
+      return { label: key, value: val, trend };
+    });
+
+    // Extract Income Data
+    const rawIncome = extractBlock('---INCOME_START---', '---INCOME_END---');
+    let incomeData: IncomeData | undefined = undefined;
+    
+    // Basic validation to ensure we have enough data to form the object
+    if (Object.keys(rawIncome).length >= 4) {
+        incomeData = {
+            revenue: rawIncome['Revenue'] || 'N/A',
+            revenueGrowth: rawIncome['Revenue Growth'] || 'N/A',
+            grossMargin: rawIncome['Gross Margin'] || '0%',
+            operatingMargin: rawIncome['Operating Margin'] || '0%',
+            netIncome: rawIncome['Net Income'] || 'N/A',
+            netMargin: rawIncome['Net Margin'] || '0%',
+        };
     }
 
     return {
-      markdownContent: cleanMarkdown,
+      markdownContent: cleanMarkdown.trim(),
       metrics,
+      incomeData,
       sources,
       companyName: query.toUpperCase(),
       ticker: query.toUpperCase(), // Simplification, ideally we'd extract the real ticker
